@@ -1,0 +1,15 @@
+*************cú pháp rút gọn****************
+-----------------------------------
+POST / HTTP/1.1
+Host: host123iot.000webhostapp.com
+Connection: keep-alive
+Content-Length: 14
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+Content-Type: application/x-www-form-urlencoded
+
+DATA=123412345
+-----------------------------
+
+GET /data.txt HTTP/1.1
+Host: host123iot.000webhostapp.com
