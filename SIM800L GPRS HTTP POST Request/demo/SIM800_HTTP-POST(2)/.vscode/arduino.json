@@ -1,0 +1,6 @@
+{
+    "port": "COM11",
+    "programmer": "AVR ISP",
+    "board": "arduino:avr:micro",
+    "sketch": "SIM800_HTTP-POST.ino"
+}
