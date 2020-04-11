@@ -6,7 +6,7 @@ String apn = "m-wap";                        //APN
 String url = "host123iot.000webhostapp.com"; //URL for HTTP-POST-REQUEST
 char DATA[300] = "DATA=hello...";
 
-char BTS_GSM[200] = "";          // AT+CENG?
+char BTS_GSM[60] = "";           // AT+CENG?
 SoftwareSerial mySerial(10, 16); // RX, TX Pins
 SerialCommand SCmd;
 
@@ -16,25 +16,24 @@ void SimSetup()
   Serial.begin(115200);
 
   SCmd.addCommand("SEND", SendHost);
-  SCmd.addCommand("SIM", SimCeng);
+  SCmd.addCommand("CENG", SimCeng);
+  SCmd.addCommand("CSQ", Sim_CSQ);
+  SCmd.addCommand("TKC", Sim_TKC);
   SCmd.addCommand("test", SimTest);
   SCmd.addDefaultHandler(unrecognized); // Handler for command that isn't matched  (says "What?")
 
   delay(3000);
   Serial.println("READY...");
 
-  mySerial.println("AT");
-  delay(100);
-  Answer();
-  mySerial.println("ATE0");
-  delay(100);
-  Answer();
+  AT_sim("AT");
+  AT_wait(1000);
+  AT_sim("ATE0");
+  AT_wait(1000);
+  AT_sim("");
 }
 void SimRun()
 {
   SCmd.readSerial(); // We don't do much, just process serial commands
-  //Sim_AT("AT");
-  //delay(3000);
 }
 ///////********************************/////////////
 void unrecognized()
@@ -93,16 +92,17 @@ void Sim_AT(const char *command, uint16_t wait = 1000)
 }
 void SimTest()
 {
-  char buffer[60] = ""; //27+27=54
-  AT_sim("AT+CENG?");
-  AT_find("CENG:", 10000); //bo qua  +CENG: 3,0
-  mySerial.find("CENG:");   //+CENG: 0,"452,01,7c9e,c1fd,13,68"
-  mySerial.readBytes(buffer, 27);
-  mySerial.find("CENG:"); //+CENG: 1,
-  mySerial.readBytes(&buffer[27], 27);
-  Serial.println(buffer);
-  Serial.println("...");
-  AT_sim("AT");
+  mySerial.setTimeout(3000);
+  AT_sim("AT+CSQ");
+  AT_wait(1000);
+  AT_sim("AT+SAPBR=1,1");
+  AT_wait(3000);
+  AT_sim("AT+SAPBR=2,1");
+  AT_wait(3000);
+  AT_sim("AT+CLBS=1,1");
+  AT_wait(60000);
+  AT_sim("");
+
   Serial.println("XONG");
 }
 void SendHost()
@@ -155,46 +155,78 @@ void SendHost()
 }
 void SimCeng()
 {
-  char buffer[7][27] = {"", "", "", "", "", "", ""};
-  Sim_AT("AT+CENG=3,0", 500);
-  Sim_AT("AT+CENG?", 0);   // +CENG: 0,"452,01,7c9e,c1fd,13,68"
-  mySerial.find("+CENG:"); // bo qua  +CENG: 3,0
-  for (uint8_t i = 0; i < 7; i++)
-  {
-    mySerial.find("+CENG:");
-    mySerial.readBytes(buffer[i], 27);
-    Serial.println(buffer[i]);
-    //BTS_GSM = buffer;
-  }
-  Serial.println("BTS_GSM");
-  sprintf(DATA, "DATA=%s", buffer);
-  Serial.println(DATA);
+  mySerial.setTimeout(1000);
+  AT_sim("AT+CENG=3,0");
+  AT_wait(1000);
+  AT_sim("AT+CENG?");
+  AT_wait(1000);
+  mySerial.find("CENG:");
+  mySerial.find("+CENG: 0,");
+  mySerial.readBytes(BTS_GSM, 24);
+  mySerial.find("+CENG: 1,");
+  mySerial.readBytes(&BTS_GSM[24], 24);
+  Serial.print("BTS_GSM=");
+  Serial.println(BTS_GSM);
+  //AT_sim("");
+  Serial.println("***");
 }
 void SimLBS()
 {
 }
+void Sim_CSQ()
+{
+  long CSQ;
+  mySerial.setTimeout(1000);
+  AT_sim("AT+CSQ");
+  AT_wait(1000);
+  CSQ = mySerial.parseInt();
+  Serial.print("CSQ=");
+  Serial.println(CSQ);
+  AT_sim("");
+  Serial.println("***");
+}
+void Sim_TKC()
+{
+  long TKC;
+  mySerial.setTimeout(10000);
+  AT_sim("AT+CUSD=1,\"*101#\"");
+  AT_wait(1000);
+  mySerial.find("TKC");
+  TKC = mySerial.parseInt();
+  Serial.print("TKC=");
+  Serial.println(TKC);
+  //AT_sim("");
+  Serial.println("***");
+}
 void AT_sim(const char *command)
 {
-  while (mySerial.available()) //xoa bo dem
+  if (mySerial.available())
   {
-    Serial.write(mySerial.read()); // in
-    delay(1);
+    while (mySerial.available()) //xoa bo dem
+    {
+      Serial.write(mySerial.read()); // in
+      delay(1);
+    }
+    Serial.println("");
   }
   Serial.print("Command:  ");
   Serial.println(command);
   mySerial.println(command); //gui lenh AT
 }
-void AT_find(const char *key, uint16_t wait)
+void AT_find(const char *key, unsigned long wait)
 {
   char keyword[] = "";
-  unsigned long time = millis();
-
   strcpy(keyword, key);
-  while (mySerial.available() == 0) //cho den khi nhan duoc du lieu
+
+  if (mySerial.available())
   {
-    if (millis() - time > wait) //thoat khi qua thoi gian
+    unsigned long time = millis();
+    while (mySerial.available() == 0) //cho den khi nhan duoc du lieu
     {
-      break;
+      if (millis() - time > wait) //thoat khi qua thoi gian
+      {
+        break;
+      }
     }
   }
   if (mySerial.find(keyword))
@@ -204,5 +236,16 @@ void AT_find(const char *key, uint16_t wait)
   else
   {
     Serial.println("Unknown");
+  }
+}
+void AT_wait(unsigned long wait)
+{
+  unsigned long time = millis();
+  while (mySerial.available() == 0) //cho den khi nhan duoc du lieu
+  {
+    if (millis() - time > wait) //thoat khi qua thoi gian
+    {
+      break;
+    }
   }
 }

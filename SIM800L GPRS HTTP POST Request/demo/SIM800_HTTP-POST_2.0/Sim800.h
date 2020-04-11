@@ -13,7 +13,10 @@ void Sim_AT(const char *command, uint16_t wait = 1000);
 void SimTest();
 void SendHost();
 void SimCeng();
+void Sim_CSQ();
+void Sim_TKC();
 void AT_find(const char *keyword, uint16_t wait);
 void AT_sim(const char *command);
+void AT_wait(unsigned long wait);
 
 #endif
